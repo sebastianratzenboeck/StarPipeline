@@ -2,7 +2,9 @@ import numpy as np
 from typing import List
 from pyphot import sandbox as pyphot
 from pyphot import svo, unit
+from astropy import units as u
 from base import PipelineStep
+from dev.data import Star
 
 
 class Photometry(PipelineStep):
@@ -57,29 +59,34 @@ class Photometry(PipelineStep):
         # Set the zero points
         return self
 
-    def transform(self, data: dict) -> dict:
+    def transform(self, data: Star) -> Star:
         """Apply the filters to the spectrum"""
         # Fetch the parameters
-        flux = data['flam_dust']
-        wave = data['wavelength']
-        # Check units
-        self.check_units(wave.units, {'angstrom': 1.0})
-        self.check_units(flux.units, {'erg': 1.0, 'second': -1.0, 'centimeter': -2.0, 'angstrom': -1.0})
+        flux = data.flam_dusty
+        wave = data.wavelength
         # Compute the magnitudes
         flux_bands = dict()
         mag_band = dict()
         cl_band = dict()
         for pb in self._filter_bands:
-            flux_in_band = pb.get_flux(wave.magnitude, flux.magnitude)
-            # flux_in_band = pb.get_flux(wave, flam)
-            f_zpt = self.get_zero_point_flux(pb)
-            mag_in_band = -2.5 * np.log10(flux_in_band / f_zpt)
-            # Get central wavelength
-            central_wl = pb.cl.to(unit[str(wave.units)])
+            # Create the filtered flux & convert to same units (just in case)
+            flux_in_band = pb.get_flux(wave.value, flux.value).to(
+                unit['erg'] / (unit['s'] * unit['Angstrom'] * unit['cm']**2)
+            )
+            # Get the zero point flux & convert to same units (just in case)
+            f_zpt = self.get_zero_point_flux(pb).to(unit['erg'] / (unit['s'] * unit['Angstrom'] * unit['cm']**2))
+            # Compute the magnitude
+            mag_in_band = -2.5 * np.log10(flux_in_band / f_zpt) * u.mag
+            # Convert to astropy units object
+            flux_in_band = flux_in_band.magnitude * u.erg / u.s / u.cm**2 / u.AA
+            # Get central wavelength (and convert to astropy units object)
+            central_wl = pb.cl.to(unit['angstrom']).magnitude * u.AA
             # Store magnitudes and fluxes
             flux_bands[pb.name] = flux_in_band
             mag_band[pb.name] = mag_in_band
             cl_band[pb.name] = central_wl
         # Add the magnitudes to the data dictionary
-        data.update({'mag_band': mag_band, 'flam_band': flux_bands, 'cl_band': cl_band})
+        data.mag_band = mag_band
+        data.flam_band = flux_bands
+        data.cl_band = cl_band
         return data

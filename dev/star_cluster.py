@@ -4,6 +4,7 @@ import pandas as pd
 from base import PipelineStep
 from astropy import units as u
 from astropy.coordinates import ICRS, Galactic, SkyCoord
+from data import Star
 
 
 class StarCluster(PipelineStep):
@@ -46,21 +47,16 @@ class StarCluster(PipelineStep):
         skycoords = SkyCoord(c_icrs)
         return skycoords
 
-    def transform(self, data: dict) -> dict:
+    def transform(self, data: Star) -> Star:
         # Simulate cluster
         self.simulate_cluster()
         skycoords = self.skycoord_from_galactic(self.X_gal.values)
-        # Get distance
-        dist_pc = skycoords.distance.to('pc')
         # Save masses, logAge, etc.
         logAge_samples = np.full_like(self.mass_samples, self.logAge)
         Z_samples = np.full_like(self.mass_samples, self.Z)
         # Save important stuff
-        data.update(
-            {
-                'distance': dist_pc.value, 'skycoords': skycoords,
-                'logAge': logAge_samples, 'Z': Z_samples, 'mass': self.mass_samples,
-                'lifetime_logAge': self.lifetime_logAge,
-            }
-        )
+        data.logAge = logAge_samples
+        data.Z = Z_samples
+        data.mass = self.mass_samples
+        data.skycoords = skycoords
         return data

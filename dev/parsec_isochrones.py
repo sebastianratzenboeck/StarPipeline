@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import LinearNDInterpolator
 from base import PipelineStep
+from data import Star
 
 
 class ICBase:
@@ -140,15 +141,16 @@ class Parsec(ParsecInterpolator, PipelineStep):
     def __str__(self):
         return f"ParsecInterpolator: using following files {self.flist_all}"
 
-    def transform(self, data: dict) -> dict:
+    def transform(self, data: Star) -> Star:
         """Get physical stellar paramters from masses, logAge, and metallicity"""
         # Fetch the parameters
-        mass = data['mass']
-        logAge = data['logAge']
-        Z = data['Z']
+        mass = data.mass
+        logAge = data.logAge
+        Z = data.Z
         # Compute the stellar parameters
         logg, logT, logL = self.query_cmd_Z(mass, logAge, Z).values.T
         # Update the data dictionary with the new parameters
-        data.update({'logg': logg, 'logT': logT, 'logL': logL})
+        data.logg = logg
+        data.logT = logT
+        data.logL = logL
         return data
-

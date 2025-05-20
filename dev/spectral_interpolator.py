@@ -1,6 +1,8 @@
 import numpy as np
 import pystellibs
+from astropy import units as u
 from base import PipelineStep
+from data import Star
 
 
 class SpectrumGenerator(PipelineStep):
@@ -51,22 +53,41 @@ class SpectrumGenerator(PipelineStep):
             self._spec_interpolator = stellib
         return self
 
-    def transform(self, data: dict) -> dict:
+    def transform(self, data: Star) -> Star:
         """Generate spectra for the given parameters"""
         # Fetch the parameters
-        logT = data['logT']
-        logg = data['logg']
-        logL = data['logL']
-        Z = data['Z']
+        logT = data.logT
+        logg = data.logg
+        logL = data.logL
+        Z = data.Z
+        distance_pc = data.distance
         # Compute the spectra
         points = np.array([logT, logg])
         isin_param_range = self._spec_interpolator.points_inside(points.T)
+        print(f'Generating spectra for {isin_param_range.sum()} sources (out of {len(logT)})')
         wave, specs = self._spec_interpolator.generate_individual_spectra(
             logT=logT[isin_param_range],
             logg=logg[isin_param_range],
             logL=logL[isin_param_range],
             Z=Z[isin_param_range],
         )
-        # Also already add dust extincted spectrum (just in case no extinction is applied in the pipeline)
-        data.update({'wavelength': wave, 'specs': specs, 'specs_dust': specs, 'isin_param_range': isin_param_range})
+        # Transform the spectra to astropy units
+        # First make sure the units are correct
+        wave = wave.to('Angstrom')
+        specs = specs.to('erg / (s * Angstrom)')
+        # now transform to astropy units
+        wave_ap = wave.magnitude * u.AA
+        specs_ap = specs.magnitude * u.erg / u.s / u.AA
+
+        # to avoid having to carry the mask around, we save NaNs for the spectra outside the range
+        specs_all = np.full((len(logT), len(wave)), np.nan) * u.erg / u.s / u.AA
+        specs_all[isin_param_range] = specs_ap
+
+        # Transform generic spectra to observed fluxes at Earth
+        distance_cm = distance_pc.to(u.cm)
+        flux_at_earth = specs_all / (4 * np.pi * distance_cm[..., None] ** 2)
+
+        # Update data
+        data.wavelength = wave_ap
+        data.flam = flux_at_earth
         return data
