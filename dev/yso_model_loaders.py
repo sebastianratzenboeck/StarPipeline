@@ -4,10 +4,9 @@ import pandas as pd
 from astropy import units as u
 from astropy.table import Table
 from sedfitter.sed import SEDCube
-from scipy.interpolate import NearestNDInterpolator, interp1d
+from scipy.interpolate import NearestNDInterpolator
 from astropy.constants import c as c_light_speed
 from sklearn.preprocessing import StandardScaler
-from data import Star
 
 
 class R17:

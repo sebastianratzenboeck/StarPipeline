@@ -8,7 +8,7 @@ from torch import optim
 
 
 class SpectrumNet(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dims=(128, 256, 512), dropout=0.2):
+    def __init__(self, input_dim, output_dim, hidden_dims=(1024, 1024), dropout=0.2):
         super().__init__()
         layers = []
         dims = [input_dim] + list(hidden_dims)
@@ -25,7 +25,7 @@ class SpectrumNet(nn.Module):
 
 
 class SpectrumPredictor:
-    def __init__(self, input_dim, output_dim, hidden_dims=(128, 128), dropout=0.2, device=None):
+    def __init__(self, input_dim, output_dim, hidden_dims=(1024, 1024), dropout=0.2, device=None):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
