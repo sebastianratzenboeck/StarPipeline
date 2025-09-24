@@ -13,9 +13,8 @@ class EvoTrackPARSEC(PipelineStep):
     def init_interpolator(self):
         # Create a linear interpolator for logL, logT, and logR
         # based on logAge, logMass, and logZ
-        # interp_nn =  NearestNDInterpolator(
-        self.df['mass'] = 10**self.df['logAge']
-        # Fit in linear mass
+        # interp_nn =  LinearNDInterpolator(
+        # Fit in nearest nd interpolator is much faster than linear interpolator
         interpolator = NearestNDInterpolator(
             self.df[['logAge', 'mass', 'Z']].values,
             self.df[['logL', 'logT', 'logR']].values,

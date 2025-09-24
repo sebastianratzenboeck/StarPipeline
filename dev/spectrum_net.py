@@ -28,11 +28,15 @@ class SpectrumPredictor:
     def __init__(self, input_dim, output_dim, hidden_dims=(1024, 1024), dropout=0.2, device=None):
         self.input_dim = input_dim
         self.output_dim = output_dim
+        self.hidden_dims = hidden_dims
+        self.dropout = dropout
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.model = SpectrumNet(input_dim, output_dim, hidden_dims, dropout).to(self.device)
         self.dataset = None
         self.input_mean = None
         self.input_std = None
+        self.y_mean = None
+        self.y_std = None
 
     def _normalize_inputs(self, X):
         return (X - self.input_mean) / self.input_std
@@ -45,7 +49,8 @@ class SpectrumPredictor:
     def train_model(
             self, X_train, Y_train,
             X_val=None, Y_val=None,
-            n_epochs=100, batch_size=64, learning_rate=1e-3, verbose=True):
+            n_epochs=100, batch_size=64,
+            learning_rate=1e-3, outdir='checkpoints/', save_every_n=10, verbose=True):
         self._fit_input_normalization(X_train)
         X_train_norm = self._normalize_inputs(X_train)
         train_dataset = SpectralDataset(X_train_norm, Y_train)
@@ -61,8 +66,10 @@ class SpectrumPredictor:
         optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         self.model.train()
         self.model.to(self.device)
+        self.dataset = train_dataset
 
-        os.makedirs("checkpoints", exist_ok=True)
+        if outdir:
+            os.makedirs(outdir, exist_ok=True)
 
         for epoch in range(1, n_epochs + 1):
             total_loss, total_count = 0.0, 0
@@ -97,12 +104,12 @@ class SpectrumPredictor:
             elif verbose:
                 print(f"Epoch {epoch:>3} | Train Loss: {avg_train_loss:.6f}")
 
-            if epoch % 10 == 0:
-                checkpoint_path = f"checkpoints/spectrum_predictor_epoch{epoch}.pt"
+            if (epoch % save_every_n == 0) and outdir:
+                checkpoint_path = os.path.join(outdir, f"spectrum_predictor_epoch-{epoch}.pt")
                 self.save(checkpoint_path)
 
         self.model.eval()
-        self.dataset = train_dataset
+
 
     def predict(self, X):
         X = (X - self.input_mean) / self.input_std
@@ -114,24 +121,44 @@ class SpectrumPredictor:
 
     def predict_flux(self, X):
         pred_norm = self.predict(X)
-        return self.dataset.denormalize(pred_norm)
+        if isinstance(pred_norm, torch.Tensor):
+            Y_np = pred_norm.detach().cpu().numpy()
+        else:
+            Y_np = pred_norm
+
+        if (self.y_std is not None) and (self.y_mean is not None):
+            log_spectrum = Y_np * self.y_std + self.y_mean
+        else:
+            log_spectrum = Y_np
+        flux_spectrum = 10 ** log_spectrum
+        return flux_spectrum
 
     def save(self, path):
         torch.save({
             'model_state': self.model.state_dict(),
             'input_dim': self.input_dim,
             'output_dim': self.output_dim,
+            'hidden_dims': self.hidden_dims,
+            'dropout': self.dropout,
             'input_mean': self.input_mean,
-            'input_std': self.input_std
+            'input_std': self.input_std,
+            'y_mean': self.dataset.means if self.dataset else None,
+            'y_std': self.dataset.stds if self.dataset else None
         }, path)
 
     def load(self, path):
-        checkpoint = torch.load(path, map_location=self.device)
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
         self.input_dim = checkpoint['input_dim']
         self.output_dim = checkpoint['output_dim']
+        self.hidden_dims = checkpoint['hidden_dims']
+        self.dropout = checkpoint['dropout']
         self.input_mean = checkpoint['input_mean']
         self.input_std = checkpoint['input_std']
-        self.model = SpectrumNet(self.input_dim, self.output_dim).to(self.device)
+        self.y_mean = checkpoint['y_mean']
+        self.y_std = checkpoint['y_std']
+        self.model = SpectrumNet(
+            input_dim=self.input_dim, output_dim=self.output_dim, hidden_dims=self.hidden_dims, dropout=self.dropout
+        ).to(self.device)
         self.model.load_state_dict(checkpoint['model_state'])
         self.model.eval()
 

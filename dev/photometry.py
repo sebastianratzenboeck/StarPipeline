@@ -4,7 +4,7 @@ from pyphot import sandbox as pyphot
 from pyphot import svo, unit
 from astropy import units as u
 from base import PipelineStep
-from dev.data import Star
+from data import Star
 
 
 class Photometry(PipelineStep):
@@ -68,7 +68,10 @@ class Photometry(PipelineStep):
         flux_bands = dict()
         mag_band = dict()
         cl_band = dict()
+        transmission_band = dict()
         for pb in self._filter_bands:
+            lam_filter_aa = pb.wavelength.to('AA').value
+            transmit_filter = pb.transmit
             # Create the filtered flux & convert to same units (just in case)
             flux_in_band = pb.get_flux(wave.value, flux.value).to(
                 unit['erg'] / (unit['s'] * unit['Angstrom'] * unit['cm']**2)
@@ -85,8 +88,10 @@ class Photometry(PipelineStep):
             flux_bands[pb.name] = flux_in_band
             mag_band[pb.name] = mag_in_band
             cl_band[pb.name] = central_wl
+            transmission_band[pb.name] = {'lam_aa': lam_filter_aa, 'transmit': transmit_filter}
         # Add the magnitudes to the data dictionary
         data.mag_band = mag_band
         data.flam_band = flux_bands
         data.cl_band = cl_band
+        data.filter_transmission = transmission_band
         return data

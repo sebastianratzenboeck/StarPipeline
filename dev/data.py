@@ -170,6 +170,8 @@ class SEDData(Star):
     _av_law: Optional[Callable] = np.vectorize(extinction.fitzpatrick99, signature='(n),(),(),()->(n)')
     # Spectal parameters
     _wavelength: Optional[u.Quantity] = None
+    _wavelength_edges: Optional[u.Quantity] = None
+    w_log: Optional[np.ndarray] = None
     _flam: Optional[u.Quantity] = None
     # YSO specific parameters
     _wavelength_yso: Optional[u.Quantity] = None
@@ -208,6 +210,15 @@ class SEDData(Star):
         if value is not None:
             self.check_units(value, u.AA)
         self._wavelength = value
+
+    @property
+    def wavelength_edges(self) -> Optional[u.Quantity]:
+        """Return the wavelength edges of the SEDData"""
+        return self._wavelength_edges
+
+    @wavelength_edges.setter
+    def wavelength_edges(self, value: Optional[u.Quantity]) -> None:
+        self._wavelength_edges = value
 
     # --------------------
     # flam
@@ -285,6 +296,7 @@ class PhotData(SEDData):
     _flam_band: dict = None  # Flux in the band
     _mag_band: dict = None   # Magnitude in the band
     _cl_band: dict = None    # Central wavelength
+    _filter_transmission: dict = None
 
     # --------------------
     # flam_band
@@ -326,3 +338,16 @@ class PhotData(SEDData):
                 self.check_units(cl_in_band, u.AA)
         self._cl_band = value
 
+    # --------------------
+    # transmission function
+    @property
+    def filter_transmission(self) -> dict:
+        return self._filter_transmission
+
+    @filter_transmission.setter
+    def filter_transmission(self, value: dict) -> None:
+        # if value is not None:
+        #     for band_name, trans_func in value.items():
+        #         if trans_func.size != self.wavelength.size:
+        #             raise ValueError("Transmission function size mismatch")
+        self._filter_transmission = value

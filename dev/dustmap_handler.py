@@ -38,9 +38,13 @@ class DustMap(PipelineStep):
     def set_dustmap(self, new_dustmap, **kwargs):
         if new_dustmap.lower() == 'edenhofer':
             # Hard coded dustmap name for now --> add added flexibility to change the dustmap via setter function
-            fname_map = os.path.join(self.map_base_path, 'mean_and_std_healpix.fits')
-            # Extract query kwargs
             mode = kwargs.pop('mode', 'mean')   # mean, samples, or random_sample
+            if mode == 'mean':
+                fname_map = os.path.join(self.map_base_path, 'mean_and_std_healpix.fits')
+            else:
+                fname_map = os.path.join(self.map_base_path, 'samples_healpix.fits')
+                mode = 'random_sample'
+            # Extract query kwargs
             self.__query_kwargs = dict(mode=mode)
             # Set the dustmap
             load_samples = kwargs.pop('load_samples', False)
